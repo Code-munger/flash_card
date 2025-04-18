@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CompTIA A+ Acronym Flashcards & Quiz</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    h1 { text-align: center; color: #333; }
+    .tab-controls { text-align: center; margin: 20px 0; }
+    .tab-controls button { padding: 10px 20px; margin: 0 10px; font-size: 16px; cursor: pointer; }
+    .flashcards, .quiz-section { display: none; flex-wrap: wrap; justify-content: center; gap: 20px; }
+    .active { display: flex !important; }
+    .card { width: 300px; height: 200px; perspective: 1000px; }
+    .card-inner { width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative; cursor: pointer; }
+    .card:hover .card-inner { transform: rotateY(180deg); }
+    .card-front, .card-back {
+      position: absolute; backface-visibility: hidden; background: white; padding: 20px;
+      border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); height: 100%; width: 100%;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+    }
+    .card-back { transform: rotateY(180deg); }
+    .acronym { font-size: 2em; font-weight: bold; color: #007acc; }
+    .definition { font-weight: bold; margin-top: 10px; }
+    .explanation { margin-top: 10px; font-size: 0.95em; color: #333; }
+    .quiz-box { background: white; padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); text-align: center; }
+    .quiz-option { margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+<h1>📘 Acronym Flashcards & Quiz</h1>
+
+<div class="tab-controls">
+  <button onclick="showTab('flashcards')">🃏 Flashcards</button>
+  <button onclick="startQuiz()">🧠 Quiz</button>
+</div>
+
+<div class="flashcards active" id="flashcardsContainer"></div>
+<div class="quiz-section" id="quizSection">
+  <div class="quiz-box" id="quizBox"></div>
+</div>
+
+<script>
+const acronyms = [
+  { acronym: "AAA", definition: "Authentication, Authorization, and Accounting", explanation: "Verifies identity, grants access, and logs actions." },
+  { acronym: "ACL", definition: "Access Control List", explanation: "Controls which users/systems can access resources." },
+  { acronym: "ADF", definition: "Automatic Document Feeder", explanation: "Feeds multiple pages into a scanner or printer." },
+  { acronym: "AES", definition: "Advanced Encryption Standard", explanation: "Encrypts sensitive data for security." },
+  { acronym: "BIOS", definition: "Basic Input/Output System", explanation: "Starts and tests hardware before loading the OS." },
+  { acronym: "CPU", definition: "Central Processing Unit", explanation: "Performs all the logic and calculations in a computer." },
+  { acronym: "DHCP", definition: "Dynamic Host Configuration Protocol", explanation: "Automatically assigns IP addresses to devices." },
+  { acronym: "DNS", definition: "Domain Name System", explanation: "Translates website names to IP addresses." },
+];
+
+function showTab(tab) {
+  document.getElementById('flashcardsContainer').classList.remove('active');
+  document.getElementById('quizSection').classList.remove('active');
+  if (tab === 'flashcards') {
+    document.getElementById('flashcardsContainer').classList.add('active');
+  } else {
+    document.getElementById('quizSection').classList.add('active');
+  }
+}
+
+function renderFlashcards() {
+  const container = document.getElementById('flashcardsContainer');
+  container.innerHTML = '';
+  acronyms.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="card-inner">
+        <div class="card-front"><div class="acronym">${card.acronym}</div></div>
+        <div class="card-back">
+          <div class="definition">${card.definition}</div>
+          <div class="explanation">${card.explanation}</div>
+        </div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function startQuiz() {
+  showTab('quiz');
+  const quizBox = document.getElementById('quizBox');
+  const question = acronyms[Math.floor(Math.random() * acronyms.length)];
+  const options = [question.definition];
+  while (options.length < 4) {
+    const opt = acronyms[Math.floor(Math.random() * acronyms.length)].definition;
+    if (!options.includes(opt)) options.push(opt);
+  }
+  options.sort(() => Math.random() - 0.5);
+
+  quizBox.innerHTML = `
+    <div><strong>What does "${question.acronym}" stand for?</strong></div>
+    ${options.map(opt => `<div class="quiz-option"><button onclick="alert('${opt === question.definition ? '✅ Correct!' : '❌ Incorrect'}')">${opt}</button></div>`).join('')}
+  `;
+}
+
+renderFlashcards();
+</script>
+
+</body>
+</html>
