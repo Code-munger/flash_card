@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>CompTIA A+ Acronym Flashcards & Quiz</title>
+  <title>AI Acronym Flashcards & Quiz</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
     h1 { text-align: center; color: #333; }
@@ -26,11 +26,12 @@
     .quiz-option { margin: 10px 0; }
     .score-board { text-align: center; font-weight: bold; margin: 10px; }
     #uploadSection { text-align: center; margin-bottom: 20px; }
+    .loading { text-align: center; margin: 10px; font-style: italic; color: gray; }
   </style>
 </head>
 <body>
 
-<h1>📘 MYCC Flashcards & Quiz</h1>
+<h1>📘 AI-Powered Acronym Flashcards & Quiz</h1>
 
 <div id="uploadSection">
   <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.docx,.pdf" />
@@ -43,6 +44,7 @@
 </div>
 
 <div class="score-board" id="scoreBoard">Score: 0 / 0</div>
+<div class="loading" id="loadingMessage" style="display: none;">🔄 Generating explanations with AI...</div>
 <div class="flashcards active" id="flashcardsContainer"></div>
 <div class="quiz-section" id="quizSection">
   <div class="quiz-box" id="quizBox"></div>
@@ -81,15 +83,18 @@ function showTab(tab) {
 function renderFlashcards() {
   const container = document.getElementById('flashcardsContainer');
   container.innerHTML = '';
-  acronyms.forEach(card => {
+  acronyms.forEach(async (card, index) => {
     const div = document.createElement('div');
     div.className = 'card';
     div.innerHTML = `
       <div class="card-inner">
-        <div class="card-front"><div class="acronym">${card.acronym}</div></div>
+        <div class="card-front">
+          <div class="acronym">${card.acronym}</div>
+        </div>
         <div class="card-back">
           <div class="definition">${card.definition}</div>
-          <div class="explanation">${card.explanation}</div>
+          <div class="explanation" id="exp-${index}">${card.explanation || '(No explanation)'}</div>
+          ${!card.explanation ? `<button onclick="generateSingleExplanation(${index})">✨ Generate Explanation</button>` : ''}
         </div>
       </div>`;
     container.appendChild(div);
@@ -137,27 +142,48 @@ function checkAnswer(selected, correct) {
   nextQuestion();
 }
 
-// File parsing logic
-function handleFileUpload(event) {
+async function generateExplanation(acronym, definition) {
+  const prompt = `Explain what \"${acronym}\" means: ${definition}`;
+  const response = await fetch("https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct", {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer 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",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ inputs: prompt, options: { wait_for_model: true } })
+  });
+  const data = await response.json();
+  return data?.[0]?.generated_text?.replace(prompt, "").trim() || "";
+}
+
+async function generateSingleExplanation(index) {
+  const card = acronyms[index];
+  const expEl = document.getElementById(`exp-${index}`);
+  expEl.innerText = '⏳ Generating...';
+  const result = await generateExplanation(card.acronym, card.definition);
+  acronyms[index].explanation = result;
+  expEl.innerText = result;
+}
+
+async function handleFileUpload(event) {
   const file = event.target.files[0];
   const reader = new FileReader();
+  document.getElementById('loadingMessage').style.display = 'block';
 
   if (file.name.endsWith(".csv") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(sheet);
-      rows.forEach(row => {
+      for (const row of rows) {
         if (row.Acronym && row.Definition) {
-          acronyms.push({
-            acronym: row.Acronym.trim(),
-            definition: row.Definition.trim(),
-            explanation: row.Explanation || ""
-          });
+          const explanation = row.Explanation || await generateExplanation(row.Acronym, row.Definition);
+          acronyms.push({ acronym: row.Acronym.trim(), definition: row.Definition.trim(), explanation });
         }
-      });
+      }
       renderFlashcards();
+      document.getElementById('loadingMessage').style.display = 'none';
     };
     reader.readAsArrayBuffer(file);
   } else if (file.name.endsWith(".pdf")) {
@@ -170,17 +196,17 @@ function handleFileUpload(event) {
         text += content.items.map(item => item.str).join(' ') + '\n';
       }
       const lines = text.split('\n');
-      lines.forEach(line => {
+      for (const line of lines) {
         const parts = line.split('-');
         if (parts.length >= 2) {
-          acronyms.push({
-            acronym: parts[0].trim(),
-            definition: parts[1].trim(),
-            explanation: parts.slice(2).join('-').trim() || ""
-          });
+          const acronym = parts[0].trim();
+          const definition = parts[1].trim();
+          const explanation = parts.slice(2).join('-').trim() || await generateExplanation(acronym, definition);
+          acronyms.push({ acronym, definition, explanation });
         }
-      });
+      }
       renderFlashcards();
+      document.getElementById('loadingMessage').style.display = 'none';
     };
     reader.readAsArrayBuffer(file);
   }
@@ -190,4 +216,5 @@ renderFlashcards();
 </script>
 </body>
 </html>
+
 
