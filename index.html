@@ -62,7 +62,6 @@
   </style>
 </head>
 <body>
-
 <h1>📘 AI-Powered Acronym Flashcards & Quiz</h1>
 <div id="uploadSection">
   <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.docx,.pdf" />
@@ -91,6 +90,88 @@
 </div>
 
 <script>
+let acronyms = [
+  { acronym: "AAA", definition: "Authentication, Authorization, and Accounting", explanation: "Verifies identity, grants access, and logs actions." },
+  { acronym: "ACL", definition: "Access Control List", explanation: "Controls which users/systems can access resources." },
+  { acronym: "AES", definition: "Advanced Encryption Standard", explanation: "Encrypts sensitive data for security." },
+  { acronym: "BIOS", definition: "Basic Input/Output System", explanation: "Starts and tests hardware before loading the OS." },
+  { acronym: "CPU", definition: "Central Processing Unit", explanation: "Performs logic and calculations in a computer." },
+  { acronym: "DHCP", definition: "Dynamic Host Configuration Protocol", explanation: "Automatically assigns IP addresses to devices." },
+  { acronym: "DNS", definition: "Domain Name System", explanation: "Translates domain names to IP addresses." }
+];
+
+function showTab(tab) {
+  document.getElementById('flashcardsContainer').classList.remove('active');
+  document.getElementById('quizSection').classList.remove('active');
+  if (tab === 'flashcards') {
+    document.getElementById('flashcardsContainer').classList.add('active');
+  } else {
+    document.getElementById('quizSection').classList.add('active');
+  }
+  renderFlashcards();
+}
+
+function renderFlashcards() {
+  const container = document.getElementById('flashcardsContainer');
+  container.innerHTML = '';
+  acronyms.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="card-inner">
+        <div class="card-front">
+          <div class="acronym">${card.acronym}</div>
+        </div>
+        <div class="card-back">
+          <div class="definition">${card.definition}</div>
+          <div class="explanation">${card.explanation}</div>
+        </div>
+      </div>`;
+    container.appendChild(div);
+  });
+}
+
+function startQuiz() {
+  showTab('quiz');
+  let score = 0;
+  let quizIndex = 0;
+  let quizData = [...acronyms].sort(() => 0.5 - Math.random()).slice(0, 20);
+  updateScore(0, 0);
+  nextQuestion();
+
+  function updateScore(score, index) {
+    document.getElementById('scoreBoard').innerText = `Score: ${score} / ${index}`;
+  }
+
+  function nextQuestion() {
+    const quizBox = document.getElementById('quizBox');
+    if (quizIndex >= quizData.length) {
+      quizBox.innerHTML = `<h3>🎉 Quiz Complete!</h3><p>Your score: ${score}/${quizData.length}</p>`;
+      return;
+    }
+
+    const question = quizData[quizIndex];
+    let options = [question.definition];
+    while (options.length < 4) {
+      const opt = acronyms[Math.floor(Math.random() * acronyms.length)].definition;
+      if (!options.includes(opt)) options.push(opt);
+    }
+    options.sort(() => Math.random() - 0.5);
+
+    quizBox.innerHTML = `
+      <div><strong>(${quizIndex + 1}/${quizData.length}) What does "${question.acronym}" stand for?</strong></div>
+      ${options.map(opt => `<div class="quiz-option"><button onclick="checkAnswer('${opt.replace(/'/g, "\\'")}', '${question.definition.replace(/'/g, "\\'")}')">${opt}</button></div>`).join('')}
+    `;
+  }
+
+  window.checkAnswer = function (selected, correct) {
+    if (selected === correct) score++;
+    quizIndex++;
+    updateScore(score, quizIndex);
+    nextQuestion();
+  }
+}
+
 function toggleChatbot() {
   const chat = document.getElementById("chatWindow");
   chat.style.display = chat.style.display === "flex" ? "none" : "flex";
@@ -120,10 +201,12 @@ async function sendChat() {
   messages.innerHTML += `<div><strong>AVA:</strong> ${answer}</div>`;
   messages.scrollTop = messages.scrollHeight;
 }
-</script>
 
+renderFlashcards();
+</script>
 </body>
 </html>
+
 
 
 
