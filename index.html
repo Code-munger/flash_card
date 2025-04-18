@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>AI Acronym Flashcards & Quiz</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
     h1 { text-align: center; color: #333; }
@@ -54,7 +56,24 @@
       flex-direction: column;
       overflow: hidden;
     }
-    .chat-header { background: #007acc; color: white; padding: 10px; text-align: center; font-weight: bold; }
+    .chat-header {
+      background: #007acc;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+      position: relative;
+    }
+    .chat-header button {
+      position: absolute;
+      right: 10px;
+      top: 5px;
+      background: transparent;
+      color: white;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+    }
     .chat-messages { flex: 1; padding: 10px; overflow-y: auto; font-size: 0.9em; }
     .chat-input { display: flex; border-top: 1px solid #ccc; }
     .chat-input input { flex: 1; padding: 10px; border: none; outline: none; }
@@ -64,52 +83,37 @@
 <body>
 <h1>📘 AI-Powered Acronym Flashcards & Quiz</h1>
 <div id="uploadSection">
-  <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.docx,.pdf" />
-  <p style="font-size:0.9em;">Upload CSV, Excel, Word or PDF containing acronyms</p>
+  <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+  <p style="font-size:0.9em;">Upload CSV or Excel file containing acronyms</p>
 </div>
 <div class="tab-controls">
   <button onclick="showTab('flashcards')">🃏 Flashcards</button>
-  <button onclick="startQuiz()">🧠 Quiz</button>
+  <button onclick="showTab('quiz')">🧠 Quiz</button>
 </div>
 <div class="score-board" id="scoreBoard">Score: 0 / 0</div>
-<div class="loading" id="loadingMessage" style="display: none;">🔄 Generating explanations with AI...</div>
+<div class="loading" id="loadingMessage" style="display:none;">🔄 Generating explanations with AI...</div>
 <div class="flashcards active" id="flashcardsContainer"></div>
 <div class="quiz-section" id="quizSection">
   <div class="quiz-box" id="quizBox"></div>
 </div>
-
-<!-- Chatbot Tutor -->
 <button class="chatbot-button" onclick="toggleChatbot()">💬</button>
 <div class="chat-window" id="chatWindow">
-  <div class="chat-header">Ask the AI Tutor</div>
+  <div class="chat-header">
+    Ask the AI Tutor
+    <button onclick="toggleChatbot()">✖</button>
+  </div>
   <div class="chat-messages" id="chatMessages"></div>
   <div class="chat-input">
     <input type="text" id="chatInput" placeholder="Ask a question..." onkeydown="if(event.key==='Enter')sendChat()" />
     <button onclick="sendChat()">▶</button>
   </div>
 </div>
-
 <script>
-let acronyms = [
-  { acronym: "AAA", definition: "Authentication, Authorization, and Accounting", explanation: "Verifies identity, grants access, and logs actions." },
-  { acronym: "ACL", definition: "Access Control List", explanation: "Controls which users/systems can access resources." },
-  { acronym: "AES", definition: "Advanced Encryption Standard", explanation: "Encrypts sensitive data for security." },
-  { acronym: "BIOS", definition: "Basic Input/Output System", explanation: "Starts and tests hardware before loading the OS." },
-  { acronym: "CPU", definition: "Central Processing Unit", explanation: "Performs logic and calculations in a computer." },
-  { acronym: "DHCP", definition: "Dynamic Host Configuration Protocol", explanation: "Automatically assigns IP addresses to devices." },
-  { acronym: "DNS", definition: "Domain Name System", explanation: "Translates domain names to IP addresses." }
-];
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('fileInput').addEventListener('change', handleFile);
+});
 
-function showTab(tab) {
-  document.getElementById('flashcardsContainer').classList.remove('active');
-  document.getElementById('quizSection').classList.remove('active');
-  if (tab === 'flashcards') {
-    document.getElementById('flashcardsContainer').classList.add('active');
-  } else {
-    document.getElementById('quizSection').classList.add('active');
-  }
-  renderFlashcards();
-}
+let acronyms = [];
 
 function renderFlashcards() {
   const container = document.getElementById('flashcardsContainer');
@@ -124,51 +128,46 @@ function renderFlashcards() {
         </div>
         <div class="card-back">
           <div class="definition">${card.definition}</div>
-          <div class="explanation">${card.explanation}</div>
+          ${card.explanation ? `<div class="explanation">${card.explanation}</div>` : ''}
         </div>
       </div>`;
     container.appendChild(div);
   });
 }
 
-function startQuiz() {
-  showTab('quiz');
-  let score = 0;
-  let quizIndex = 0;
-  let quizData = [...acronyms].sort(() => 0.5 - Math.random()).slice(0, 20);
-  updateScore(0, 0);
-  nextQuestion();
-
-  function updateScore(score, index) {
-    document.getElementById('scoreBoard').innerText = `Score: ${score} / ${index}`;
+function showTab(tab) {
+  document.getElementById('flashcardsContainer').classList.remove('active');
+  document.getElementById('quizSection').classList.remove('active');
+  if (tab === 'flashcards') {
+    document.getElementById('flashcardsContainer').classList.add('active');
+    renderFlashcards();
+  } else if (tab === 'quiz') {
+    document.getElementById('quizSection').classList.add('active');
   }
+}
 
-  function nextQuestion() {
-    const quizBox = document.getElementById('quizBox');
-    if (quizIndex >= quizData.length) {
-      quizBox.innerHTML = `<h3>🎉 Quiz Complete!</h3><p>Your score: ${score}/${quizData.length}</p>`;
-      return;
-    }
-
-    const question = quizData[quizIndex];
-    let options = [question.definition];
-    while (options.length < 4) {
-      const opt = acronyms[Math.floor(Math.random() * acronyms.length)].definition;
-      if (!options.includes(opt)) options.push(opt);
-    }
-    options.sort(() => Math.random() - 0.5);
-
-    quizBox.innerHTML = `
-      <div><strong>(${quizIndex + 1}/${quizData.length}) What does "${question.acronym}" stand for?</strong></div>
-      ${options.map(opt => `<div class="quiz-option"><button onclick="checkAnswer('${opt.replace(/'/g, "\\'")}', '${question.definition.replace(/'/g, "\\'")}')">${opt}</button></div>`).join('')}
-    `;
-  }
-
-  window.checkAnswer = function (selected, correct) {
-    if (selected === correct) score++;
-    quizIndex++;
-    updateScore(score, quizIndex);
-    nextQuestion();
+function handleFile(event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const data = new Uint8Array(e.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    acronyms = jsonData.map(row => ({
+      acronym: row.Acronym || row.acronym,
+      definition: row.Definition || row.definition,
+      explanation: row.Explanation || row.explanation
+    })).filter(a => a.acronym && a.definition);
+    renderFlashcards();
+    showTab('flashcards');
+  };
+  reader.onerror = function(error) {
+    console.error('Error reading file:', error);
+    alert('Error reading the uploaded file.');
+  };
+  if (file) {
+    reader.readAsArrayBuffer(file);
   }
 }
 
@@ -201,8 +200,6 @@ async function sendChat() {
   messages.innerHTML += `<div><strong>AVA:</strong> ${answer}</div>`;
   messages.scrollTop = messages.scrollHeight;
 }
-
-renderFlashcards();
 </script>
 </body>
 </html>
