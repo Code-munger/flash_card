@@ -22,26 +22,36 @@
     .acronym { font-size: 2em; font-weight: bold; color: #007acc; }
     .definition { font-weight: bold; margin-top: 10px; }
     .explanation { margin-top: 10px; font-size: 0.95em; color: #333; }
-    .quiz-box { background: white; padding: 20px; border-radius: 10px; width: 300px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); text-align: center; }
+    .quiz-box { background: white; padding: 20px; border-radius: 10px; width: 400px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); text-align: center; }
     .quiz-option { margin: 10px 0; }
+    .score-board { text-align: center; font-weight: bold; margin: 10px; }
+    #uploadSection { text-align: center; margin-bottom: 20px; }
   </style>
 </head>
 <body>
 
 <h1>📘 Acronym Flashcards & Quiz</h1>
 
+<div id="uploadSection">
+  <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.docx,.pdf" />
+  <p style="font-size:0.9em;">Upload CSV, Excel, Word or PDF containing acronyms</p>
+</div>
+
 <div class="tab-controls">
   <button onclick="showTab('flashcards')">🃏 Flashcards</button>
   <button onclick="startQuiz()">🧠 Quiz</button>
 </div>
 
+<div class="score-board" id="scoreBoard">Score: 0 / 0</div>
 <div class="flashcards active" id="flashcardsContainer"></div>
 <div class="quiz-section" id="quizSection">
   <div class="quiz-box" id="quizBox"></div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 <script>
-const acronyms = [
+let acronyms = [
   { acronym: "AAA", definition: "Authentication, Authorization, and Accounting", explanation: "Verifies identity, grants access, and logs actions." },
   { acronym: "ACL", definition: "Access Control List", explanation: "Controls which users/systems can access resources." },
   { acronym: "ADF", definition: "Automatic Document Feeder", explanation: "Feeds multiple pages into a scanner or printer." },
@@ -51,6 +61,12 @@ const acronyms = [
   { acronym: "DHCP", definition: "Dynamic Host Configuration Protocol", explanation: "Automatically assigns IP addresses to devices." },
   { acronym: "DNS", definition: "Domain Name System", explanation: "Translates website names to IP addresses." },
 ];
+
+let quizIndex = 0;
+let score = 0;
+let quizData = [];
+
+document.getElementById('fileInput').addEventListener('change', handleFileUpload);
 
 function showTab(tab) {
   document.getElementById('flashcardsContainer').classList.remove('active');
@@ -82,9 +98,26 @@ function renderFlashcards() {
 
 function startQuiz() {
   showTab('quiz');
+  score = 0;
+  quizIndex = 0;
+  quizData = [...acronyms].sort(() => 0.5 - Math.random()).slice(0, 20);
+  updateScore();
+  nextQuestion();
+}
+
+function updateScore() {
+  document.getElementById('scoreBoard').innerText = `Score: ${score} / ${quizIndex}`;
+}
+
+function nextQuestion() {
   const quizBox = document.getElementById('quizBox');
-  const question = acronyms[Math.floor(Math.random() * acronyms.length)];
-  const options = [question.definition];
+  if (quizIndex >= quizData.length) {
+    quizBox.innerHTML = `<h3>🎉 Quiz Complete!</h3><p>Your score: ${score}/${quizData.length}</p>`;
+    return;
+  }
+
+  const question = quizData[quizIndex];
+  let options = [question.definition];
   while (options.length < 4) {
     const opt = acronyms[Math.floor(Math.random() * acronyms.length)].definition;
     if (!options.includes(opt)) options.push(opt);
@@ -92,13 +125,69 @@ function startQuiz() {
   options.sort(() => Math.random() - 0.5);
 
   quizBox.innerHTML = `
-    <div><strong>What does "${question.acronym}" stand for?</strong></div>
-    ${options.map(opt => `<div class="quiz-option"><button onclick="alert('${opt === question.definition ? '✅ Correct!' : '❌ Incorrect'}')">${opt}</button></div>`).join('')}
+    <div><strong>(${quizIndex + 1}/${quizData.length}) What does "${question.acronym}" stand for?</strong></div>
+    ${options.map(opt => `<div class="quiz-option"><button onclick="checkAnswer('${opt.replace(/'/g, "\\'")}', '${question.definition.replace(/'/g, "\\'")}')">${opt}</button></div>`).join('')}
   `;
+}
+
+function checkAnswer(selected, correct) {
+  if (selected === correct) score++;
+  quizIndex++;
+  updateScore();
+  nextQuestion();
+}
+
+// File parsing logic
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+
+  if (file.name.endsWith(".csv") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+    reader.onload = function (e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+      rows.forEach(row => {
+        if (row.Acronym && row.Definition) {
+          acronyms.push({
+            acronym: row.Acronym.trim(),
+            definition: row.Definition.trim(),
+            explanation: row.Explanation || ""
+          });
+        }
+      });
+      renderFlashcards();
+    };
+    reader.readAsArrayBuffer(file);
+  } else if (file.name.endsWith(".pdf")) {
+    reader.onload = async function () {
+      const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      const lines = text.split('\n');
+      lines.forEach(line => {
+        const parts = line.split('-');
+        if (parts.length >= 2) {
+          acronyms.push({
+            acronym: parts[0].trim(),
+            definition: parts[1].trim(),
+            explanation: parts.slice(2).join('-').trim() || ""
+          });
+        }
+      });
+      renderFlashcards();
+    };
+    reader.readAsArrayBuffer(file);
+  }
 }
 
 renderFlashcards();
 </script>
-
 </body>
 </html>
+
